@@ -21,6 +21,7 @@ hs_err_pid*
 
 # Configuration and Temporary Files
 config_files/
+tmp/
 *.tmp
 *.temp
 

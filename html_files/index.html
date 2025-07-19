@@ -3,8 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent Graph Manager</title>
-    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+          // Listen for messages from iframes
+        window.addEventListener('message', function(event) {
+            if (event.origin !== window.location.origin) return;
+            
+            console.log('Main: Received message:', event.data);
+            const { type, data } = event.data;
+            
+            switch (type) {
+                case 'configUploaded':
+                    console.log('Main: Configuration uploaded, refreshing monitor...');
+                    // Broadcast to all other frames
+                    broadcastToFrames('configUpdated', data, 'uploadFrame');
+                    // Immediately refresh the monitor frame
+                    sendToFrame('monitorFrame', 'refreshTopics', {});
+                    showNotification('Configuration uploaded successfully!', 'success');
+                    break; Graph Manager</title>
     <style>
         * {
             margin: 0;
@@ -43,122 +57,48 @@
             margin-bottom: 40px;
         }
         
-        .main-content {
+        .frame-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 40px;
             margin-bottom: 40px;
         }
         
-        .upload-section, .monitor-section {
-            background: rgba(40, 40, 40, 0.6);
+        .frame-full-width {
+            grid-column: 1 / -1;
+            margin-bottom: 40px;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: none;
             border-radius: 20px;
-            padding: 30px;
+            background: rgba(40, 40, 40, 0.6);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(177, 156, 217, 0.2);
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
         
-        .section-title {
-            color: #b19cd9;
-            font-size: 1.5rem;
-            margin-bottom: 20px;
-            text-align: center;
+        iframe.graph-frame {
+            height: 600px;
         }
         
-        .file-upload {
-            border: 2px dashed #b19cd9;
-            border-radius: 15px;
-            padding: 40px;
-            text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            background: rgba(177, 156, 217, 0.05);
-        }
-        
-        .file-upload:hover {
-            border-color: #c9a96e;
-            background: rgba(201, 169, 110, 0.1);
-        }
-        
-        .file-upload input[type="file"] {
-            display: none;
-        }
-        
-        .upload-text {
+        .loading-fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 400px;
             color: #87ceeb;
             font-size: 1.1rem;
-            margin-bottom: 10px;
-        }
-        
-        .upload-btn {
-            background: linear-gradient(45deg, #b19cd9, #c9a96e);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 25px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(177, 156, 217, 0.3);
-        }
-        
-        .upload-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(177, 156, 217, 0.4);
-        }
-        
-        #topics-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            background: rgba(60, 60, 60, 0.4);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        
-        #topics-table th {
-            background: linear-gradient(45deg, #b19cd9, #c9a96e);
-            color: white;
-            padding: 15px;
-            font-weight: 600;
-        }
-        
-        #topics-table td {
-            padding: 12px 15px;
-            border-bottom: 1px solid rgba(177, 156, 217, 0.2);
-            color: #f0f0f0;
-        }
-        
-        #topics-table tr:hover {
-            background: rgba(177, 156, 217, 0.1);
-        }
-        
-        .graph-container {
             background: rgba(40, 40, 40, 0.6);
             border-radius: 20px;
-            padding: 30px;
-            backdrop-filter: blur(10px);
             border: 1px solid rgba(177, 156, 217, 0.2);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            margin-top: 40px;
-            min-height: 500px;
         }
         
-        .refresh-btn {
-            background: linear-gradient(45deg, #87ceeb, #b19cd9);
-            color: white;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            float: right;
-            margin-bottom: 20px;
-        }
-        
-        .refresh-btn:hover {
-            transform: scale(1.05);
+        @keyframes slideDown {
+            from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
     </style>
 </head>
@@ -167,511 +107,146 @@
         <h1>Agent Graph Manager</h1>
         <p class="subtitle">Upload configuration and monitor your agent network in real-time</p>
         
-        <div class="main-content">
-            <div class="upload-section">
-                <h2 class="section-title">📁 Configuration Upload</h2>
-                <form id="uploadForm" enctype="multipart/form-data">
-                    <div class="file-upload" onclick="document.getElementById('configFile').click()">
-                        <div class="upload-text">Click to select configuration file</div>
-                        <div style="color: #c9a96e; font-size: 0.9rem;">Supports JSON format</div>
-                        <input type="file" id="configFile" name="configFile" accept=".json" onchange="handleFileSelect(event)">
-                    </div>
-                    <div style="text-align: center; margin-top: 20px;">
-                        <button type="button" class="upload-btn" onclick="uploadConfig()">🚀 Deploy Configuration</button>
-                    </div>
-                </form>
-            </div>
+        <div class="frame-container">
+            <iframe src="upload.html" id="uploadFrame" onload="handleFrameLoad('upload')" onerror="handleFrameError('upload')">
+                <div class="loading-fallback">📁 Loading Upload Module...</div>
+            </iframe>
             
-            <div class="monitor-section">
-                <h2 class="section-title">📊 Topic Monitor</h2>
-                <button class="refresh-btn" onclick="refreshTopics()">� Refresh</button>
-                <table id="topics-table">
-                    <thead>
-                        <tr>
-                            <th>Topic</th>
-                            <th>Last Message</th>
-                        </tr>
-                    </thead>
-                    <tbody id="topics-body">
-                        <tr>
-                            <td colspan="2" style="text-align: center; color: #87ceeb;">No configuration loaded</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <iframe src="monitor.html" id="monitorFrame" onload="handleFrameLoad('monitor')" onerror="handleFrameError('monitor')">
+                <div class="loading-fallback">📊 Loading Monitor Module...</div>
+            </iframe>
         </div>
         
-        <div class="message-section" style="background: rgba(40, 40, 40, 0.6); border-radius: 20px; padding: 30px; backdrop-filter: blur(10px); border: 1px solid rgba(177, 156, 217, 0.2); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); margin-bottom: 40px;">
-            <h2 class="section-title">✉️ Message Publisher</h2>
-            <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 20px; align-items: end;">
-                <div>
-                    <label for="topicSelect" style="color: #87ceeb; margin-bottom: 10px; display: block;">Select Topic:</label>
-                    <select id="topicSelect" style="width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #b19cd9; background: rgba(60, 60, 60, 0.8); color: #f0f0f0; font-size: 1rem;">
-                        <option value="">No topics available</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label for="messageInput" style="color: #87ceeb; margin-bottom: 10px; display: block;">Message Content:</label>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="messageInput" placeholder="Type your message here..." style="flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #b19cd9; background: rgba(60, 60, 60, 0.8); color: #f0f0f0; font-size: 1rem;" onkeypress="handleMessageKeyPress(event)">
-                        <button type="button" onclick="sendMessage()" style="background: linear-gradient(45deg, #87ceeb, #c9a96e); color: white; border: none; padding: 12px 20px; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; white-space: nowrap;">📤 Send</button>
-                    </div>
-                </div>
-                
-                <div style="text-align: center;">
-                    <div id="messageStatus" style="color: #c9a96e; font-size: 0.9rem; margin-top: 5px; min-height: 20px;"></div>
-                </div>
-            </div>
-            
-            <div style="margin-top: 20px; padding: 15px; background: rgba(135, 206, 235, 0.1); border-radius: 10px; border-left: 4px solid #87ceeb;">
-                <div style="color: #87ceeb; font-weight: bold; margin-bottom: 5px;">💡 Quick Tips:</div>
-                <div style="color: #f0f0f0; font-size: 0.9rem;">
-                    • Select a topic from the dropdown (populated after configuration upload)<br>
-                    • Type your message and click Send or press Enter<br>
-                    • Messages will be processed by subscribing agents in real-time
-                </div>
-            </div>
+        <div class="frame-full-width">
+            <iframe src="publisher.html" id="publisherFrame" onload="handleFrameLoad('publisher')" onerror="handleFrameError('publisher')">
+                <div class="loading-fallback">✉️ Loading Publisher Module...</div>
+            </iframe>
         </div>
         
-        <div class="graph-container">
-            <h2 class="section-title">🌐 Agent Network Visualization</h2>
-            <div id="graph" style="height: 450px; background: rgba(0,0,0,0.2); border-radius: 10px; position: relative;">
-                <div id="graph-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #87ceeb;">
-                    <div style="font-size: 1.2rem; margin-bottom: 10px;">📊 Network Graph</div>
-                    <div>Upload a configuration to see the dynamic graph visualization</div>
-                </div>
-                <div id="network" style="width: 100%; height: 100%; display: none;"></div>
-            </div>
-            <div id="graph-controls" style="margin-top: 15px; text-align: center; display: none;">
-                <button onclick="resetGraphView()" style="background: linear-gradient(45deg, #87ceeb, #b19cd9); color: white; border: none; padding: 8px 20px; border-radius: 20px; cursor: pointer; margin: 5px;">Reset View</button>
-                <button onclick="togglePhysics()" style="background: linear-gradient(45deg, #c9a96e, #b19cd9); color: white; border: none; padding: 8px 20px; border-radius: 20px; cursor: pointer; margin: 5px;">Toggle Physics</button>
-                <button onclick="exportGraph()" style="background: linear-gradient(45deg, #b19cd9, #87ceeb); color: white; border: none; padding: 8px 20px; border-radius: 20px; cursor: pointer; margin: 5px;">Export PNG</button>
-            </div>
+        <div class="frame-full-width">
+            <iframe src="graph.html" id="graphFrame" class="graph-frame" onload="handleFrameLoad('graph')" onerror="handleFrameError('graph')">
+                <div class="loading-fallback">🌐 Loading Graph Visualization...</div>
+            </iframe>
         </div>
     </div>
 
     <script>
-        let selectedFile = null;
-        let network = null;
-        let physicsEnabled = true;
-        let currentConfig = null;
+        // Cross-frame communication
+        let loadedFrames = new Set();
         
-        function handleFileSelect(event) {
-            selectedFile = event.target.files[0];
-            if (selectedFile) {
-                document.querySelector('.upload-text').textContent = `Selected: ${selectedFile.name}`;
-                // Preview the file content
-                previewFile(selectedFile);
+        function handleFrameLoad(frameName) {
+            loadedFrames.add(frameName);
+            console.log(`${frameName} frame loaded successfully`);
+            
+            // Initialize monitor frame when it loads
+            if (frameName === 'monitor') {
+                setTimeout(() => {
+                    sendToFrame('monitorFrame', 'initialize', {});
+                }, 100); // Small delay to ensure frame is fully ready
             }
         }
         
-        function previewFile(file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const json = JSON.parse(e.target.result);
-                    currentConfig = json;
-                    console.log('Configuration preview:', json);
-                } catch (error) {
-                    console.error('Invalid JSON file:', error);
-                }
-            };
-            reader.readAsText(file);
-        }
-        
-        function uploadConfig() {
-            if (!selectedFile) {
-                alert('Please select a configuration file first');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('configFile', selectedFile);
-            
-            // Show loading state
-            document.getElementById('graph-placeholder').innerHTML = '<div style="font-size: 1.2rem; color: #c9a96e;">🔄 Processing configuration...</div>';
-            
-            fetch('/app/conf-loader', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.text())
-            .then(html => {
-                console.log('Configuration uploaded successfully');
-                // Parse the configuration and create the graph
-                if (currentConfig && currentConfig.agents) {
-                    createNetworkGraph(currentConfig);
-                    document.getElementById('graph-controls').style.display = 'block';
-                }
-                refreshTopics();
-                updateTopicDropdown();
-                
-                // Show success notification
-                showNotification('Configuration loaded successfully!', 'success');
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showNotification('Error uploading configuration: ' + error.message, 'error');
-                document.getElementById('graph-placeholder').innerHTML = '<div style="color: #ff6b6b;">❌ Upload failed</div>';
-            });
-        }
-        
-        function createNetworkGraph(config) {
-            const nodes = new vis.DataSet();
-            const edges = new vis.DataSet();
-            const topics = new Set();
-            
-            // Collect all topics from agents
-            config.agents.forEach(agent => {
-                agent.subscriptions.forEach(topic => topics.add(topic));
-                agent.publications.forEach(topic => topics.add(topic));
-            });
-            
-            // Create topic nodes
-            let nodeId = 1;
-            const topicToId = {};
-            topics.forEach(topic => {
-                topicToId[topic] = nodeId;
-                nodes.add({
-                    id: nodeId,
-                    label: topic,
-                    group: 'topic',
-                    color: {
-                        background: '#87ceeb',
-                        border: '#5f9ea0',
-                        highlight: { background: '#b0e0e6', border: '#4682b4' }
-                    },
-                    shape: 'circle',
-                    font: { color: '#ffffff', size: 14 }
-                });
-                nodeId++;
-            });
-            
-            // Create agent nodes
-            config.agents.forEach((agent, index) => {
-                const agentId = nodeId++;
-                const agentColors = {
-                    'PlusAgent': { bg: '#b19cd9', border: '#9370db' },
-                    'MulAgent': { bg: '#c9a96e', border: '#daa520' },
-                    'DivAgent': { bg: '#ff6b9d', border: '#ff1493' },
-                    'SubAgent': { bg: '#98fb98', border: '#32cd32' },
-                    'IncAgent': { bg: '#ffa07a', border: '#ff4500' }
-                };
-                
-                const colors = agentColors[agent.agentClass] || { bg: '#b19cd9', border: '#9370db' };
-                
-                nodes.add({
-                    id: agentId,
-                    label: agent.agentClass,
-                    group: 'agent',
-                    color: {
-                        background: colors.bg,
-                        border: colors.border,
-                        highlight: { background: colors.bg + 'cc', border: colors.border }
-                    },
-                    shape: 'box',
-                    font: { color: '#ffffff', size: 12, bold: true }
-                });
-                
-                // Create edges for subscriptions (topic -> agent)
-                agent.subscriptions.forEach(topic => {
-                    edges.add({
-                        from: topicToId[topic],
-                        to: agentId,
-                        arrows: 'to',
-                        color: { color: '#87ceeb', highlight: '#5f9ea0' },
-                        width: 2,
-                        label: 'subscribes',
-                        font: { size: 10, color: '#cccccc' }
-                    });
-                });
-                
-                // Create edges for publications (agent -> topic)
-                agent.publications.forEach(topic => {
-                    edges.add({
-                        from: agentId,
-                        to: topicToId[topic],
-                        arrows: 'to',
-                        color: { color: colors.bg, highlight: colors.border },
-                        width: 2,
-                        label: 'publishes',
-                        font: { size: 10, color: '#cccccc' }
-                    });
-                });
-            });
-            
-            // Hide placeholder and show network
-            document.getElementById('graph-placeholder').style.display = 'none';
-            document.getElementById('network').style.display = 'block';
-            
-            // Create network
-            const container = document.getElementById('network');
-            const data = { nodes: nodes, edges: edges };
-            const options = {
-                nodes: {
-                    borderWidth: 2,
-                    shadow: true
-                },
-                edges: {
-                    smooth: {
-                        type: 'continuous',
-                        roundness: 0.5
-                    },
-                    shadow: true
-                },
-                physics: {
-                    enabled: physicsEnabled,
-                    barnesHut: {
-                        gravitationalConstant: -2000,
-                        centralGravity: 0.3,
-                        springLength: 95,
-                        springConstant: 0.04,
-                        damping: 0.09,
-                        avoidOverlap: 0.1
-                    },
-                    maxVelocity: 146,
-                    minVelocity: 0.1,
-                    solver: 'barnesHut',
-                    timestep: 0.35,
-                    adaptiveTimestep: true
-                },
-                interaction: {
-                    hover: true,
-                    tooltipDelay: 200,
-                    hideEdgesOnDrag: false
-                },
-                layout: {
-                    improvedLayout: true
-                }
-            };
-            
-            network = new vis.Network(container, data, options);
-            
-            // Add click event for node information
-            network.on('click', function(params) {
-                if (params.nodes.length > 0) {
-                    const nodeId = params.nodes[0];
-                    const node = nodes.get(nodeId);
-                    showNodeInfo(node);
-                }
-            });
-            
-            // Fit the network after it's stabilized
-            network.once('stabilizationIterationsDone', function() {
-                network.fit({
-                    animation: {
-                        duration: 1000,
-                        easingFunction: 'easeInOutQuad'
-                    }
-                });
-            });
-        }
-        
-        function resetGraphView() {
-            if (network) {
-                network.fit({
-                    animation: {
-                        duration: 1000,
-                        easingFunction: 'easeInOutQuad'
-                    }
-                });
-            }
-        }
-        
-        function togglePhysics() {
-            if (network) {
-                physicsEnabled = !physicsEnabled;
-                network.setOptions({ physics: { enabled: physicsEnabled } });
-                event.target.textContent = physicsEnabled ? 'Disable Physics' : 'Enable Physics';
-            }
-        }
-        
-        function exportGraph() {
-            if (network) {
-                const canvas = network.canvas.frame.canvas;
-                const link = document.createElement('a');
-                link.download = 'agent-network-graph.png';
-                link.href = canvas.toDataURL();
-                link.click();
-                showNotification('Graph exported successfully!', 'success');
-            }
-        }
-        
-        function showNodeInfo(node) {
-            const info = `
-                <div style="position: fixed; top: 20px; right: 20px; background: rgba(40, 40, 40, 0.95); border: 1px solid #b19cd9; border-radius: 10px; padding: 15px; color: #f0f0f0; z-index: 1000; max-width: 250px;">
-                    <h4 style="margin: 0 0 10px 0; color: #87ceeb;">${node.label}</h4>
-                    <p style="margin: 5px 0; font-size: 0.9rem;">Type: ${node.group}</p>
-                    <p style="margin: 5px 0; font-size: 0.9rem;">ID: ${node.id}</p>
-                    <button onclick="this.parentElement.remove()" style="background: #ff6b6b; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-top: 10px;">Close</button>
+        function handleFrameError(frameName) {
+            console.error(`Failed to load ${frameName} frame`);
+            const frame = document.getElementById(frameName + 'Frame');
+            frame.style.display = 'none';
+            frame.insertAdjacentHTML('afterend', `
+                <div class="loading-fallback" style="color: #ff6b6b;">
+                    ❌ Failed to load ${frameName} module
                 </div>
-            `;
+            `);
+        }
+        
+        // Listen for messages from child frames
+        window.addEventListener('message', function(event) {
+            if (event.origin !== window.location.origin) return;
             
-            // Remove any existing info panels
-            document.querySelectorAll('div[style*="position: fixed"]').forEach(el => {
-                if (el.innerHTML.includes('Close')) el.remove();
+            const { type, data } = event.data;
+            
+            switch (type) {
+                case 'configUploaded':
+                    // Broadcast to all other frames
+                    broadcastToFrames('configUpdated', data, 'uploadFrame');
+                    // Immediately refresh the monitor frame
+                    sendToFrame('monitorFrame', 'refreshTopics', {});
+                    showNotification('Configuration uploaded successfully!', 'success');
+                    break;
+                    
+                case 'topicsUpdated':
+                    // Send to publisher frame
+                    sendToFrame('publisherFrame', 'updateTopics', data);
+                    break;
+                    
+                case 'messageSent':
+                    // Refresh monitor
+                    sendToFrame('monitorFrame', 'refreshTopics', {});
+                    showNotification('Message sent successfully!', 'success');
+                    break;
+                    
+                case 'notification':
+                    showNotification(data.message, data.type);
+                    break;
+            }
+        });
+        
+        function broadcastToFrames(type, data, excludeFrame = null) {
+            const frames = ['uploadFrame', 'monitorFrame', 'publisherFrame', 'graphFrame'];
+            frames.forEach(frameId => {
+                if (frameId !== excludeFrame) {
+                    sendToFrame(frameId, type, data);
+                }
             });
-            
-            document.body.insertAdjacentHTML('beforeend', info);
+        }
+        
+        function sendToFrame(frameId, type, data) {
+            const frame = document.getElementById(frameId);
+            if (frame && frame.contentWindow) {
+                try {
+                    console.log(`Main: Sending ${type} to ${frameId}`, data);
+                    frame.contentWindow.postMessage({ type, data }, window.location.origin);
+                } catch (error) {
+                    console.warn(`Failed to send message to ${frameId}:`, error);
+                }
+            } else {
+                console.warn(`Frame ${frameId} not found or not loaded`);
+            }
         }
         
         function showNotification(message, type) {
             const bgColor = type === 'success' ? 'rgba(135, 206, 235, 0.9)' : 'rgba(255, 107, 107, 0.9)';
-            const notification = `
-                <div style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: ${bgColor}; color: white; padding: 15px 25px; border-radius: 25px; z-index: 1000; font-weight: bold; animation: slideDown 0.3s ease;">
-                    ${message}
-                </div>
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; 
+                top: 20px; 
+                left: 50%; 
+                transform: translateX(-50%); 
+                background: ${bgColor}; 
+                color: white; 
+                padding: 15px 25px; 
+                border-radius: 25px; 
+                z-index: 1000; 
+                font-weight: bold; 
+                animation: slideDown 0.3s ease;
             `;
+            notification.textContent = message;
             
-            document.body.insertAdjacentHTML('beforeend', notification);
+            document.body.appendChild(notification);
             
             setTimeout(() => {
-                const notif = document.querySelector('div[style*="position: fixed"][style*="top: 20px"][style*="left: 50%"]');
-                if (notif) notif.remove();
+                if (notification.parentElement) {
+                    notification.remove();
+                }
             }, 3000);
         }
         
-        function refreshTopics() {
-            fetch('/app/topics')
-                .then(response => response.text())
-                .then(html => {
-                    document.getElementById('topics-body').innerHTML = html;
-                    // Also update the topic dropdown for message sending
-                    updateTopicDropdown();
-                })
-                .catch(error => {
-                    console.error('Error refreshing topics:', error);
-                });
-        }
-        
-        function updateTopicDropdown() {
-            // Parse topics from the table and populate the dropdown
-            const topicsBody = document.getElementById('topics-body');
-            const topicSelect = document.getElementById('topicSelect');
-            
-            // Clear existing options
-            topicSelect.innerHTML = '<option value="">Select a topic...</option>';
-            
-            // Get topics from the table
-            const rows = topicsBody.querySelectorAll('tr');
-            const topics = [];
-            
-            rows.forEach(row => {
-                const cells = row.querySelectorAll('td');
-                if (cells.length >= 2) {
-                    const topicName = cells[0].textContent.trim();
-                    if (topicName && topicName !== 'No configuration loaded' && !topicName.includes('Error')) {
-                        topics.push(topicName);
-                    }
+        // Initialize frames once they're loaded
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (loadedFrames.has('monitor')) {
+                    sendToFrame('monitorFrame', 'initialize', {});
                 }
-            });
-            
-            // Sort topics alphabetically
-            topics.sort();
-            
-            // Add topics to dropdown
-            topics.forEach(topic => {
-                const option = document.createElement('option');
-                option.value = topic;
-                option.textContent = topic;
-                topicSelect.appendChild(option);
-            });
-            
-            // Update status
-            const statusElement = document.getElementById('messageStatus');
-            if (topics.length > 0) {
-                statusElement.textContent = `${topics.length} topics available`;
-                statusElement.style.color = '#87ceeb';
-            } else {
-                statusElement.textContent = 'No topics available';
-                statusElement.style.color = '#c9a96e';
-            }
-        }
-        
-        function sendMessage() {
-            const topicSelect = document.getElementById('topicSelect');
-            const messageInput = document.getElementById('messageInput');
-            const statusElement = document.getElementById('messageStatus');
-            
-            const topicName = topicSelect.value;
-            const message = messageInput.value.trim();
-            
-            if (!topicName) {
-                statusElement.textContent = '⚠️ Please select a topic';
-                statusElement.style.color = '#ffa07a';
-                return;
-            }
-            
-            if (!message) {
-                statusElement.textContent = '⚠️ Please enter a message';
-                statusElement.style.color = '#ffa07a';
-                return;
-            }
-            
-            // Show sending status
-            statusElement.textContent = '📤 Sending...';
-            statusElement.style.color = '#87ceeb';
-            
-            // Send the message via POST to TopicDisplayer
-            const params = new URLSearchParams();
-            params.append('topicName', topicName);
-            params.append('message', message);
-            
-            fetch('/app/topics', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: params.toString()
-            })
-            .then(response => response.text())
-            .then(html => {
-                // Update the topics display
-                document.getElementById('topics-body').innerHTML = html;
-                
-                // Clear the message input
-                messageInput.value = '';
-                
-                // Show success status
-                statusElement.textContent = '✅ Message sent!';
-                statusElement.style.color = '#98fb98';
-                
-                // Clear status after 3 seconds
-                setTimeout(() => {
-                    updateTopicDropdown(); // This will reset the status
-                }, 3000);
-                
-                showNotification(`Message sent to topic "${topicName}"`, 'success');
-            })
-            .catch(error => {
-                console.error('Error sending message:', error);
-                statusElement.textContent = '❌ Send failed';
-                statusElement.style.color = '#ff6b6b';
-                showNotification('Failed to send message: ' + error.message, 'error');
-            });
-        }
-        
-        function handleMessageKeyPress(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
-        }
-        
-        // Auto-refresh topics every 5 seconds
-        setInterval(refreshTopics, 5000);
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            refreshTopics();
+            }, 1000);
         });
     </script>
-    
-    <style>
-        @keyframes slideDown {
-            from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
-            to { transform: translateX(-50%) translateY(0); opacity: 1; }
-        }
-    </style>
 </body>
 </html>

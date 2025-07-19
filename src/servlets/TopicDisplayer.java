@@ -6,12 +6,16 @@ import graph.TopicManagerSingleton;
 import graph.TopicManagerSingleton.TopicManager;
 import graph.Message;
 import graph.Topic;
+import views.View;
+import views.ViewFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 public class TopicDisplayer implements Servlet {
 
@@ -72,55 +76,50 @@ public class TopicDisplayer implements Servlet {
             // Always return the current state of topics
             Collection<Topic> topics = tm.getTopics();
             
+            // Add debugging
+            System.out.println("TopicDisplayer: Found " + topics.size() + " topics");
+            for (Topic t : topics) {
+                System.out.println("TopicDisplayer: Topic - " + t.name + " with message: " + 
+                    (t.getLastMessage() != null ? t.getLastMessage().asText : "null"));
+            }
+            
+            // Send proper HTTP headers first
+            toClient.write("HTTP/1.1 200 OK\r\n".getBytes());
+            toClient.write("Content-Type: text/html; charset=UTF-8\r\n".getBytes());
+            toClient.write("Cache-Control: no-cache, no-store, must-revalidate\r\n".getBytes());
+            toClient.write("Pragma: no-cache\r\n".getBytes());
+            toClient.write("Expires: 0\r\n".getBytes());
+            toClient.write("\r\n".getBytes());
+            
+            // Use the TopicView to render the response
+            View topicView = ViewFactory.createView(ViewFactory.ViewType.TOPIC_TABLE);
+            
             if (topics.isEmpty()) {
-                // Return a message indicating no configuration is loaded
-                String html = "<tr><td colspan=\"2\" style=\"text-align: center; color: #87ceeb; padding: 20px;\">No configuration loaded</td></tr>";
-                toClient.write("HTTP/1.1 200 OK\r\n".getBytes());
-                toClient.write("Content-Type: text/html\r\n".getBytes());
-                toClient.write(("Content-Length: " + html.length() + "\r\n").getBytes());
-                toClient.write("\r\n".getBytes());
-                toClient.write(html.getBytes());
+                topicView.render("No configuration loaded", toClient);
             } else {
-                // Generate HTML table rows for topics
-                StringBuilder html = new StringBuilder();
-                for (Topic t : topics) {
-                    String lastMessage = "No messages";
-                    try {
-                        Message msg = t.getLastMessage();
-                        if (msg != null) {
-                            lastMessage = msg.asText;
-                        }
-                    } catch (Exception e) {
-                        lastMessage = "No messages";
-                    }
-                    
-                    html.append("<tr>")
-                        .append("<td style=\"padding: 12px 15px; border-bottom: 1px solid rgba(177, 156, 217, 0.2); color: #f0f0f0;\">")
-                        .append(t.name)
-                        .append("</td>")
-                        .append("<td style=\"padding: 12px 15px; border-bottom: 1px solid rgba(177, 156, 217, 0.2); color: #f0f0f0;\">")
-                        .append(lastMessage)
-                        .append("</td>")
-                        .append("</tr>");
-                }
-                
-                String response = html.toString();
-                toClient.write("HTTP/1.1 200 OK\r\n".getBytes());
-                toClient.write("Content-Type: text/html\r\n".getBytes());
-                toClient.write(("Content-Length: " + response.length() + "\r\n").getBytes());
-                toClient.write("\r\n".getBytes());
-                toClient.write(response.getBytes());
+                // Convert Collection to List for the view
+                List<Topic> topicList = new ArrayList<>(topics);
+                topicView.render(topicList, toClient);
             }
             
         } catch (Exception e) {
             System.out.println("TopicDisplayer Error: " + e.getMessage());
             e.printStackTrace();
-            String errorHtml = "<tr><td colspan=\"2\" style=\"text-align: center; color: #ff6b6b; padding: 20px;\">Error: " + e.getMessage() + "</td></tr>";
-            toClient.write("HTTP/1.1 500 Internal Server Error\r\n".getBytes());
-            toClient.write("Content-Type: text/html\r\n".getBytes());
-            toClient.write(("Content-Length: " + errorHtml.length() + "\r\n").getBytes());
-            toClient.write("\r\n".getBytes());
-            toClient.write(errorHtml.getBytes());
+            
+            // Use the TopicView to render the error
+            View topicView = ViewFactory.createView(ViewFactory.ViewType.TOPIC_TABLE);
+            
+            try {
+                // Write error status
+                toClient.write("HTTP/1.1 500 Internal Server Error\r\n".getBytes());
+                toClient.write("Content-Type: text/html\r\n".getBytes());
+                toClient.write("\r\n".getBytes());
+                
+                // Render error through view
+                topicView.render("Error: " + e.getMessage(), toClient);
+            } catch (IOException ioError) {
+                System.err.println("Failed to send error response: " + ioError.getMessage());
+            }
         }
     }
 

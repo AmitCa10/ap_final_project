@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Network Graph</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: rgba(40, 40, 40, 0.6);
+            color: #f0f0f0;
+            height: 100vh;
+            padding: 30px;
+        }
+        
+        .section-title {
+            color: #b19cd9;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        #graph {
+            height: 450px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            position: relative;
+        }
+        
+        #graph-placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #87ceeb;
+        }
+        
+        #network {
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
+        
+        #graph-controls {
+            margin-top: 15px;
+            text-align: center;
+            display: none;
+        }
+        
+        .control-btn {
+            background: linear-gradient(45deg, #87ceeb, #b19cd9);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .control-btn.alt {
+            background: linear-gradient(45deg, #c9a96e, #b19cd9);
+        }
+        
+        .control-btn.export {
+            background: linear-gradient(45deg, #b19cd9, #87ceeb);
+        }
+    </style>
+</head>
+<body>
+    <h2 class="section-title">🌐 Agent Network Visualization</h2>
+    
+    <div id="graph">
+        <div id="graph-placeholder">
+            <div style="font-size: 1.2rem; margin-bottom: 10px;">📊 Network Graph</div>
+            <div>Upload a configuration to see the dynamic graph visualization</div>
+        </div>
+        <div id="network"></div>
+    </div>
+    
+    <div id="graph-controls">
+        <button class="control-btn" onclick="resetGraphView()">Reset View</button>
+        <button class="control-btn alt" onclick="togglePhysics()">Toggle Physics</button>
+        <button class="control-btn export" onclick="exportGraph()">Export PNG</button>
+    </div>
+
+    <script>
+        let network = null;
+        let physicsEnabled = true;
+        let currentConfig = null;
+        
+        function createNetworkGraph(config) {
+            const nodes = new vis.DataSet();
+            const edges = new vis.DataSet();
+            const topics = new Set();
+            
+            // Collect all topics from agents
+            config.agents.forEach(agent => {
+                agent.subscriptions.forEach(topic => topics.add(topic));
+                agent.publications.forEach(topic => topics.add(topic));
+            });
+            
+            // Create topic nodes
+            let nodeId = 1;
+            const topicToId = {};
+            topics.forEach(topic => {
+                topicToId[topic] = nodeId;
+                nodes.add({
+                    id: nodeId,
+                    label: topic,
+                    group: 'topic',
+                    color: {
+                        background: '#87ceeb',
+                        border: '#5f9ea0',
+                        highlight: { background: '#b0e0e6', border: '#4682b4' }
+                    },
+                    shape: 'circle',
+                    font: { color: '#ffffff', size: 14 }
+                });
+                nodeId++;
+            });
+            
+            // Create agent nodes
+            config.agents.forEach((agent, index) => {
+                const agentId = nodeId++;
+                const agentColors = {
+                    'PlusAgent': { bg: '#b19cd9', border: '#9370db' },
+                    'MulAgent': { bg: '#c9a96e', border: '#daa520' },
+                    'DivAgent': { bg: '#ff6b9d', border: '#ff1493' },
+                    'SubAgent': { bg: '#98fb98', border: '#32cd32' },
+                    'IncAgent': { bg: '#ffa07a', border: '#ff4500' }
+                };
+                
+                const colors = agentColors[agent.agentClass] || { bg: '#b19cd9', border: '#9370db' };
+                
+                nodes.add({
+                    id: agentId,
+                    label: agent.agentClass,
+                    group: 'agent',
+                    color: {
+                        background: colors.bg,
+                        border: colors.border,
+                        highlight: { background: colors.bg + 'cc', border: colors.border }
+                    },
+                    shape: 'box',
+                    font: { color: '#ffffff', size: 12, bold: true }
+                });
+                
+                // Create edges for subscriptions (topic -> agent)
+                agent.subscriptions.forEach(topic => {
+                    edges.add({
+                        from: topicToId[topic],
+                        to: agentId,
+                        arrows: 'to',
+                        color: { color: '#87ceeb', highlight: '#5f9ea0' },
+                        width: 2,
+                        label: 'subscribes',
+                        font: { size: 10, color: '#cccccc' }
+                    });
+                });
+                
+                // Create edges for publications (agent -> topic)
+                agent.publications.forEach(topic => {
+                    edges.add({
+                        from: agentId,
+                        to: topicToId[topic],
+                        arrows: 'to',
+                        color: { color: colors.bg, highlight: colors.border },
+                        width: 2,
+                        label: 'publishes',
+                        font: { size: 10, color: '#cccccc' }
+                    });
+                });
+            });
+            
+            // Hide placeholder and show network
+            document.getElementById('graph-placeholder').style.display = 'none';
+            document.getElementById('network').style.display = 'block';
+            
+            // Create network
+            const container = document.getElementById('network');
+            const data = { nodes: nodes, edges: edges };
+            const options = {
+                nodes: {
+                    borderWidth: 2,
+                    shadow: true
+                },
+                edges: {
+                    smooth: {
+                        type: 'continuous',
+                        roundness: 0.5
+                    },
+                    shadow: true
+                },
+                physics: {
+                    enabled: physicsEnabled,
+                    barnesHut: {
+                        gravitationalConstant: -2000,
+                        centralGravity: 0.3,
+                        springLength: 95,
+                        springConstant: 0.04,
+                        damping: 0.09,
+                        avoidOverlap: 0.1
+                    },
+                    maxVelocity: 146,
+                    minVelocity: 0.1,
+                    solver: 'barnesHut',
+                    timestep: 0.35,
+                    adaptiveTimestep: true
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 200,
+                    hideEdgesOnDrag: false
+                },
+                layout: {
+                    improvedLayout: true
+                }
+            };
+            
+            network = new vis.Network(container, data, options);
+            
+            // Add click event for node information
+            network.on('click', function(params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = nodes.get(nodeId);
+                    showNodeInfo(node);
+                }
+            });
+            
+            // Fit the network after it's stabilized
+            network.once('stabilizationIterationsDone', function() {
+                network.fit({
+                    animation: {
+                        duration: 1000,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            });
+            
+            // Show controls
+            document.getElementById('graph-controls').style.display = 'block';
+        }
+        
+        function resetGraphView() {
+            if (network) {
+                network.fit({
+                    animation: {
+                        duration: 1000,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }
+        }
+        
+        function togglePhysics() {
+            if (network) {
+                physicsEnabled = !physicsEnabled;
+                network.setOptions({ physics: { enabled: physicsEnabled } });
+                event.target.textContent = physicsEnabled ? 'Disable Physics' : 'Enable Physics';
+            }
+        }
+        
+        function exportGraph() {
+            if (network) {
+                const canvas = network.canvas.frame.canvas;
+                const link = document.createElement('a');
+                link.download = 'agent-network-graph.png';
+                link.href = canvas.toDataURL();
+                link.click();
+                
+                // Notify parent about successful export
+                window.parent.postMessage({
+                    type: 'notification',
+                    data: { message: 'Graph exported successfully!', type: 'success' }
+                }, '*');
+            }
+        }
+        
+        function showNodeInfo(node) {
+            const info = `
+                <div style="position: fixed; top: 20px; right: 20px; background: rgba(40, 40, 40, 0.95); border: 1px solid #b19cd9; border-radius: 10px; padding: 15px; color: #f0f0f0; z-index: 1000; max-width: 250px;">
+                    <h4 style="margin: 0 0 10px 0; color: #87ceeb;">${node.label}</h4>
+                    <p style="margin: 5px 0; font-size: 0.9rem;">Type: ${node.group}</p>
+                    <p style="margin: 5px 0; font-size: 0.9rem;">ID: ${node.id}</p>
+                    <button onclick="this.parentElement.remove()" style="background: #ff6b6b; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-top: 10px;">Close</button>
+                </div>
+            `;
+            
+            // Remove any existing info panels
+            document.querySelectorAll('div[style*="position: fixed"]').forEach(el => {
+                if (el.innerHTML.includes('Close')) el.remove();
+            });
+            
+            document.body.insertAdjacentHTML('beforeend', info);
+        }
+        
+        // Listen for messages from parent
+        window.addEventListener('message', function(event) {
+            const { type, data } = event.data;
+            
+            switch (type) {
+                case 'configUpdated':
+                    currentConfig = data.config;
+                    if (currentConfig && currentConfig.agents) {
+                        createNetworkGraph(currentConfig);
+                    }
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

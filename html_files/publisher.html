@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message Publisher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: rgba(40, 40, 40, 0.6);
+            color: #f0f0f0;
+            height: 100vh;
+            padding: 30px;
+        }
+        
+        .section-title {
+            color: #b19cd9;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .publisher-form {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            align-items: end;
+        }
+        
+        label {
+            color: #87ceeb;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #b19cd9;
+            background: rgba(60, 60, 60, 0.8);
+            color: #f0f0f0;
+            font-size: 1rem;
+        }
+        
+        .message-input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .message-input-container input {
+            flex: 1;
+        }
+        
+        .send-btn {
+            background: linear-gradient(45deg, #87ceeb, #c9a96e);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(135, 206, 235, 0.3);
+        }
+        
+        #messageStatus {
+            color: #c9a96e;
+            font-size: 0.9rem;
+            margin-top: 5px;
+            min-height: 20px;
+            text-align: center;
+        }
+        
+        .tips-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(135, 206, 235, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid #87ceeb;
+        }
+        
+        .tips-title {
+            color: #87ceeb;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .tips-content {
+            color: #f0f0f0;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <h2 class="section-title">✉️ Message Publisher</h2>
+    
+    <div class="publisher-form">
+        <div>
+            <label for="topicSelect">Select Topic:</label>
+            <select id="topicSelect">
+                <option value="">No topics available</option>
+            </select>
+        </div>
+        
+        <div>
+            <label for="messageInput">Message Content:</label>
+            <div class="message-input-container">
+                <input type="text" id="messageInput" placeholder="Type your message here..." onkeypress="handleMessageKeyPress(event)">
+                <button type="button" class="send-btn" onclick="sendMessage()">📤 Send</button>
+            </div>
+        </div>
+        
+        <div>
+            <div id="messageStatus"></div>
+        </div>
+    </div>
+    
+    <div class="tips-box">
+        <div class="tips-title">💡 Quick Tips:</div>
+        <div class="tips-content">
+            • Select a topic from the dropdown (populated after configuration upload)<br>
+            • Type your message and click Send or press Enter<br>
+            • Messages will be processed by subscribing agents in real-time
+        </div>
+    </div>
+
+    <script>
+        function updateTopicDropdown(topics) {
+            const topicSelect = document.getElementById('topicSelect');
+            const statusElement = document.getElementById('messageStatus');
+            
+            // Clear existing options
+            topicSelect.innerHTML = '<option value="">Select a topic...</option>';
+            
+            // Add topics to dropdown
+            if (topics && topics.length > 0) {
+                topics.forEach(topic => {
+                    const option = document.createElement('option');
+                    option.value = topic;
+                    option.textContent = topic;
+                    topicSelect.appendChild(option);
+                });
+                
+                statusElement.textContent = `${topics.length} topics available`;
+                statusElement.style.color = '#87ceeb';
+            } else {
+                statusElement.textContent = 'No topics available';
+                statusElement.style.color = '#c9a96e';
+            }
+        }
+        
+        function sendMessage() {
+            const topicSelect = document.getElementById('topicSelect');
+            const messageInput = document.getElementById('messageInput');
+            const statusElement = document.getElementById('messageStatus');
+            
+            const topicName = topicSelect.value;
+            const message = messageInput.value.trim();
+            
+            if (!topicName) {
+                statusElement.textContent = '⚠️ Please select a topic';
+                statusElement.style.color = '#ffa07a';
+                return;
+            }
+            
+            if (!message) {
+                statusElement.textContent = '⚠️ Please enter a message';
+                statusElement.style.color = '#ffa07a';
+                return;
+            }
+            
+            // Show sending status
+            statusElement.textContent = '📤 Sending...';
+            statusElement.style.color = '#87ceeb';
+            
+            // Send the message via POST to TopicDisplayer
+            const params = new URLSearchParams();
+            params.append('topicName', topicName);
+            params.append('message', message);
+            
+            fetch('/app/topics', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: params.toString()
+            })
+            .then(response => response.text())
+            .then(html => {
+                // Clear the message input
+                messageInput.value = '';
+                
+                // Show success status
+                statusElement.textContent = '✅ Message sent!';
+                statusElement.style.color = '#98fb98';
+                
+                // Notify parent window
+                window.parent.postMessage({
+                    type: 'messageSent',
+                    data: { topic: topicName, message: message }
+                }, '*');
+                
+                // Clear status after 3 seconds
+                setTimeout(() => {
+                    statusElement.textContent = `${document.getElementById('topicSelect').options.length - 1} topics available`;
+                    statusElement.style.color = '#87ceeb';
+                }, 3000);
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+                statusElement.textContent = '❌ Send failed';
+                statusElement.style.color = '#ff6b6b';
+            });
+        }
+        
+        function handleMessageKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+        
+        // Listen for messages from parent
+        window.addEventListener('message', function(event) {
+            const { type, data } = event.data;
+            
+            switch (type) {
+                case 'updateTopics':
+                    updateTopicDropdown(data.topics);
+                    break;
+                case 'refreshTopics':
+                    // This will be handled by parent sending updateTopics
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
