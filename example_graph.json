@@ -1,0 +1,43 @@
+{
+  "agents": [
+    {
+      "name": "adder_agent",
+      "type": "configs.PlusAgent",
+      "subscriptions": ["input_a", "input_b"],
+      "publications": ["sum_result"]
+    },
+    {
+      "name": "multiplier_agent",
+      "type": "configs.MulAgent", 
+      "subscriptions": ["sum_result", "input_a"],
+      "publications": ["product_result"]
+    },
+    {
+      "name": "divider_agent",
+      "type": "configs.DivAgent",
+      "subscriptions": ["product_result", "input_b"],
+      "publications": ["division_result"]
+    },
+    {
+      "name": "subtractor_agent",
+      "type": "configs.SubAgent",
+      "subscriptions": ["division_result", "sum_result"],
+      "publications": ["final_output"]
+    },
+    {
+      "name": "incrementer",
+      "type": "configs.IncAgent",
+      "subscriptions": ["final_output"],
+      "publications": ["incremented_final"]
+    }
+  ],
+  "topics": [
+    "input_a",
+    "input_b", 
+    "sum_result",
+    "product_result",
+    "division_result",
+    "final_output",
+    "incremented_final"
+  ]
+}

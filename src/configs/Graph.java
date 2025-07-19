@@ -1,12 +1,12 @@
-package test;
+package configs;
 
+import graph.Agent;
+import graph.Topic;
+import graph.TopicManagerSingleton;
+import graph.TopicManagerSingleton.TopicManager;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-
-import test.TopicManagerSingleton.TopicManager;
 
 public class Graph extends ArrayList<Node> {
 
@@ -30,13 +30,13 @@ public class Graph extends ArrayList<Node> {
         tm.getTopics().forEach(t -> {
             Node topicNode = get.apply("T" + t.name);
             /* edges: topic → subscriber agents */
-            t.subs.forEach(ag -> {
+            t.getSubs().forEach(ag -> {
                 Node agentNode = get.apply("A" + ag.getName());
                 topicNode.addEdge(agentNode);
             });
             
             /* edges: publisher agents → topic */
-            t.pubs.forEach(ag -> {
+            t.getPubs().forEach(ag -> {
                 Node agentNode = get.apply("A" + ag.getName());
                 agentNode.addEdge(topicNode);
             });

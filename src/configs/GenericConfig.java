@@ -1,4 +1,7 @@
-package test;
+package configs;
+
+import graph.Agent;
+import graph.ParallelAgent;
 
 import java.io.BufferedReader;
 import java.io.IOException;

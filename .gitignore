@@ -1,1 +1,53 @@
-/.vscode
+# IDE and Editor Files
+/.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Java Compiled Files
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+build/
+target/
+out/
+
+# Logs and Debug Files
+*.log
+hs_err_pid*
+
+# Configuration and Temporary Files
+config_files/
+*.tmp
+*.temp
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Package Files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Local Environment Variables
+.env
+.env.local
+
+# Runtime and Cache
+.cache/
+.gradle/
+.m2/

@@ -1,4 +1,4 @@
-package test;
+package server;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -9,6 +9,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.concurrent.*;
+import servlet.Servlet;
 
 public class MyHTTPServer extends Thread implements HTTPServer {
 

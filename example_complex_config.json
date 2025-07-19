@@ -1,0 +1,29 @@
+{
+  "agents": [
+    {
+      "agentClass": "PlusAgent",
+      "subscriptions": ["InputA", "InputB"],
+      "publications": ["SumResult"]
+    },
+    {
+      "agentClass": "MulAgent", 
+      "subscriptions": ["SumResult", "Multiplier"],
+      "publications": ["ProductResult"]
+    },
+    {
+      "agentClass": "DivAgent",
+      "subscriptions": ["ProductResult", "Divisor"],
+      "publications": ["FinalResult"]
+    },
+    {
+      "agentClass": "IncAgent",
+      "subscriptions": ["FinalResult"],
+      "publications": ["IncrementedResult"]
+    },
+    {
+      "agentClass": "SubAgent",
+      "subscriptions": ["IncrementedResult", "SubValue"],
+      "publications": ["OutputData"]
+    }
+  ]
+}

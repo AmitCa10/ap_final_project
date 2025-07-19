@@ -1,4 +1,4 @@
-package test;
+package server;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -38,19 +38,15 @@ public class RequestParser {
             /* ---------- body & optional filename ---------- */
             StringBuilder content = new StringBuilder();
             if (contentLength > 0) {
-                // filename (multipart)
-                reader.mark(1024);
-                line = reader.readLine();
-                if (line != null && line.contains("filename=")) {
-                    parameters.put("filename", line.split("filename=")[1]);
-                    while (!(line = reader.readLine()).isEmpty()) {} // skip to blank
-                } else {
-                    reader.reset();
+                // For multipart requests, we need to read exactly contentLength characters
+                char[] buffer = new char[contentLength];
+                int totalRead = 0;
+                while (totalRead < contentLength) {
+                    int read = reader.read(buffer, totalRead, contentLength - totalRead);
+                    if (read == -1) break;
+                    totalRead += read;
                 }
-                // copy body exactly as original code expects
-                while (!(line = reader.readLine()).isEmpty())
-                    content.append(line).append('\n');
-                while (reader.ready()) reader.readLine();            // drain
+                content.append(buffer, 0, totalRead);
             }
 
             return new RequestInfo(httpCommand, uri, uriSegments,

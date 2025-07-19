@@ -1,9 +1,8 @@
-package test;
+package servlet;
 
 import java.io.IOException;
 import java.io.OutputStream;
-
-import test.RequestParser.RequestInfo;
+import server.RequestParser.RequestInfo;
 
 public interface Servlet {
     void handle(RequestInfo ri, OutputStream toClient) throws IOException;

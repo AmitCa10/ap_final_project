@@ -1,0 +1,14 @@
+{
+  "agents": [
+    {
+      "agentClass": "PlusAgent",
+      "subscriptions": ["X", "Y"],
+      "publications": ["Sum"]
+    },
+    {
+      "agentClass": "IncAgent",
+      "subscriptions": ["Sum"],
+      "publications": ["Result"]
+    }
+  ]
+}
