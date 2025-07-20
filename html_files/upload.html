@@ -129,11 +129,18 @@
             .then(html => {
                 console.log('Upload: Configuration uploaded successfully');
                 
-                // Notify parent window
+                // Fetch the current configuration data from the server
+                return fetch('/app/config-data');
+            })
+            .then(response => response.json())
+            .then(configData => {
+                console.log('Upload: Retrieved configuration data:', configData);
+                
+                // Notify parent window with the actual configuration data
                 console.log('Upload: Sending configUploaded message to parent');
                 window.parent.postMessage({
                     type: 'configUploaded',
-                    data: { config: currentConfig }
+                    data: { config: configData }
                 }, '*');
                 
                 // Reset UI

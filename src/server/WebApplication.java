@@ -3,6 +3,7 @@ package server;
 import servlets.SimpleConfLoader;
 import servlets.TopicDisplayer;
 import servlets.HtmlLoader;
+import servlets.ConfigurationDataProvider;
 
 /**
  * @file WebApplication.java
@@ -50,7 +51,7 @@ public class WebApplication {
             server.addServlet("GET", "/", htmlLoader);
             server.addServlet("GET", "/index.html", htmlLoader);
             
-            // Configuration loader (simple version)
+            // Configuration loader (refactored version following SOLID principles)
             SimpleConfLoader confLoader = new SimpleConfLoader();
             server.addServlet("GET", "/app/conf-loader", confLoader);
             server.addServlet("POST", "/app/conf-loader", confLoader);
@@ -60,6 +61,10 @@ public class WebApplication {
             server.addServlet("GET", "/app/topics", topicDisplayer);
             server.addServlet("POST", "/app/topics", topicDisplayer);
             
+            // Configuration data provider for network graph
+            ConfigurationDataProvider configDataProvider = new ConfigurationDataProvider();
+            server.addServlet("GET", "/app/config-data", configDataProvider);
+            
             System.out.println("Servlets configured:");
             System.out.println("  GET  /               -> HtmlLoader (main page)");
             System.out.println("  GET  /index.html     -> HtmlLoader");
@@ -67,6 +72,7 @@ public class WebApplication {
             System.out.println("  POST /app/conf-loader -> SimpleConfLoader (config processing)");
             System.out.println("  GET  /app/topics     -> TopicDisplayer (monitoring)");
             System.out.println("  POST /app/topics     -> TopicDisplayer (message publishing)");
+            System.out.println("  GET  /app/config-data -> ConfigurationDataProvider (graph data)");
             
             // Start the server
             System.out.println("\nStarting server on port 8080...");

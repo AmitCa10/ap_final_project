@@ -311,15 +311,42 @@
         // Listen for messages from parent
         window.addEventListener('message', function(event) {
             const { type, data } = event.data;
+            console.log('Graph: Received message:', type, data);
             
             switch (type) {
                 case 'configUpdated':
+                    console.log('Graph: Configuration updated, creating network...');
                     currentConfig = data.config;
                     if (currentConfig && currentConfig.agents) {
+                        document.getElementById('graph-placeholder').style.display = 'none';
+                        document.getElementById('network').style.display = 'block';
+                        document.getElementById('graph-controls').style.display = 'block';
                         createNetworkGraph(currentConfig);
+                    } else {
+                        console.warn('Graph: No valid agent configuration received');
                     }
                     break;
             }
+        });
+        
+        // Try to load existing configuration on page load
+        window.addEventListener('load', function() {
+            console.log('Graph: Page loaded, checking for existing configuration...');
+            fetch('/app/config-data')
+                .then(response => response.json())
+                .then(configData => {
+                    console.log('Graph: Retrieved existing configuration:', configData);
+                    if (configData && configData.agents && configData.agents.length > 0) {
+                        currentConfig = configData;
+                        document.getElementById('graph-placeholder').style.display = 'none';
+                        document.getElementById('network').style.display = 'block';
+                        document.getElementById('graph-controls').style.display = 'block';
+                        createNetworkGraph(currentConfig);
+                    }
+                })
+                .catch(error => {
+                    console.log('Graph: No existing configuration or error:', error);
+                });
         });
     </script>
 </body>

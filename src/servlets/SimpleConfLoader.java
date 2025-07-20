@@ -2,34 +2,39 @@ package servlets;
 
 import servlet.Servlet;
 import server.RequestParser.RequestInfo;
-import graph.TopicManagerSingleton;
-import graph.TopicManagerSingleton.TopicManager;
+import servlets.config.ConfigurationService;
+import servlets.config.ConfigurationResult;
+import servlets.config.ConfigurationException;
 
 import java.io.IOException;
 import java.io.OutputStream;
 
 /**
  * @file SimpleConfLoader.java
- * @brief Servlet for handling configuration file uploads and agent network setup
+ * @brief Servlet for configuration file uploads following SOLID principles
  * @author Advanced Programming Course
  * @date 2025
- * @version 1.0
+ * @version 2.0
  * 
- * This servlet handles both GET and POST requests for configuration management:
- * - GET requests return an HTML form for uploading configuration files
- * - POST requests process uploaded JSON configuration files, create topics,
- *   instantiate agents, and set up the agent network according to the configuration.
+ * This servlet has been refactored to follow SOLID principles:
+ * - Single Responsibility: Only handles HTTP request/response logic
+ * - Open-Closed: Easy to extend with new configuration formats
+ * - Liskov Substitution: Uses interfaces for extensibility
+ * - Interface Segregation: Small, focused interfaces
+ * - Dependency Inversion: Depends on ConfigurationService abstraction
  * 
- * The servlet supports multipart form data uploads and provides comprehensive
- * error handling with user-friendly error messages.
+ * The heavy lifting is now done by specialized classes in the config package.
  */
 public class SimpleConfLoader implements Servlet {
     
-    /** @brief Reference to the TopicManager for creating and managing topics */
-    private final TopicManager topicManager;
+    /** @brief Configuration service that handles all configuration logic */
+    private final ConfigurationService configurationService;
     
+    /**
+     * @brief Constructor
+     */
     public SimpleConfLoader() {
-        this.topicManager = TopicManagerSingleton.get();
+        this.configurationService = new ConfigurationService();
     }
     
     @Override
@@ -40,427 +45,159 @@ public class SimpleConfLoader implements Servlet {
     @Override
     public void handle(RequestInfo ri, OutputStream toClient) throws IOException {
         if (ri.getContent().length > 0) {
-            try {
-                System.out.println("SimpleConfLoader: Processing POST request for config upload");
-                
-                // Extract JSON content from the multipart form
-                byte[] fileContent = ri.getContent();
-                String jsonContent = extractJsonFromMultipart(fileContent);
-                
-                if (jsonContent == null || jsonContent.trim().isEmpty()) {
-                    throw new Exception("No valid JSON content found in uploaded file");
-                }
-                
-                System.out.println("SimpleConfLoader: Extracted JSON content: " + jsonContent.substring(0, Math.min(100, jsonContent.length())) + "...");
-                
-                // Validate JSON format
-                if (!isValidJson(jsonContent)) {
-                    throw new Exception("Invalid JSON format - must contain agents array");
-                }
-                
-                // Create topics and agents from the actual JSON configuration
-                createTopicsFromConfig(jsonContent);
-                
-                // Generate success response
-                String html = "<html><body style='background: #1a1a1a; color: #f0f0f0; font-family: Arial; padding: 40px;'>" +
-                        "<div style='background: rgba(177,156,217,0.1); padding: 30px; border-radius: 15px; text-align: center;'>" +
-                        "<h2 style='color: #87ceeb;'>✅ Configuration Loaded Successfully!</h2>" +
-                        "<p style='color: #c9a96e; font-size: 1.1rem;'>JSON file processed and agent network is now active.</p>" +
-                        "<div style='margin-top: 30px;'>" +
-                        "<a href='/' style='color: #87ceeb; text-decoration: none; padding: 12px 25px; background: rgba(135,206,235,0.2); border-radius: 8px; display: inline-block; margin: 5px;'>← Back to Main Page</a>" +
-                        "</div>" +
-                        "</div>" +
-                        "</body></html>";
-                
-                byte[] response = ("HTTP/1.1 200 OK\r\n" +
-                        "Content-Type: text/html\r\n" +
-                        "Content-Length: " + html.length() + "\r\n" +
-                        "\r\n" + html).getBytes();
-                toClient.write(response);
-                
-            } catch (Exception e) {
-                System.err.println("SimpleConfLoader: Error: " + e.getMessage());
-                e.printStackTrace();
-                
-                String errorHtml = "<html><body style='background: #1a1a1a; color: #f0f0f0; font-family: Arial; padding: 40px;'>" +
-                        "<div style='background: rgba(255,107,107,0.1); padding: 30px; border-radius: 15px; border-left: 4px solid #ff6b6b;'>" +
-                        "<h2 style='color: #ff6b6b;'>❌ Configuration Error</h2>" +
-                        "<p style='font-family: monospace; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 5px; margin: 15px 0;'>" +
-                        e.getMessage() + "</p>" +
-                        "<div style='margin-top: 20px;'>" +
-                        "<a href='/' style='color: #87ceeb; text-decoration: none; padding: 12px 25px; background: rgba(135,206,235,0.2); border-radius: 8px; display: inline-block;'>← Back to Main Page</a>" +
-                        "</div>" +
-                        "</div>" +
-                        "</body></html>";
-                        
-                byte[] response = ("HTTP/1.1 500 Internal Server Error\r\n" +
-                        "Content-Type: text/html\r\n" +
-                        "Content-Length: " + errorHtml.length() + "\r\n" +
-                        "\r\n" + errorHtml).getBytes();
-                toClient.write(response);
-            }
+            handleConfigurationUpload(ri, toClient);
         } else {
-            // Handle GET request - return upload form
-            String html = "<html><head><title>Upload Configuration</title></head>" +
-                    "<body style='font-family: Arial; background: #2d2d2d; color: #f0f0f0; padding: 40px;'>" +
-                    "<h2 style='color: #b19cd9;'>Configuration Upload</h2>" +
-                    "<form method='post' enctype='multipart/form-data'>" +
-                    "<div style='margin: 20px 0;'>" +
-                    "<input type='file' name='configFile' accept='.json' style='padding: 10px;'><br><br>" +
-                    "<input type='submit' value='Upload Configuration' style='background: linear-gradient(45deg, #b19cd9, #c9a96e); color: white; border: none; padding: 12px 30px; border-radius: 25px; font-size: 1rem; cursor: pointer;'>" +
-                    "</div>" +
-                    "</form>" +
-                    "<a href='/' style='color: #87ceeb; text-decoration: none;'>← Back to Main Page</a>" +
-                    "</body></html>";
-                    
-            byte[] response = ("HTTP/1.1 200 OK\r\n" +
-                    "Content-Type: text/html\r\n" +
-                    "Content-Length: " + html.length() + "\r\n" +
-                    "\r\n" + html).getBytes();
-            toClient.write(response);
+            handleUploadForm(toClient);
         }
     }
     
-    private boolean isValidJson(String jsonContent) {
+    /**
+     * @brief Handles POST requests for configuration file uploads
+     * @param ri Request information
+     * @param toClient Output stream to send response
+     * @throws IOException if response writing fails
+     */
+    private void handleConfigurationUpload(RequestInfo ri, OutputStream toClient) throws IOException {
         try {
-            jsonContent = jsonContent.trim();
-            if (!jsonContent.startsWith("{") || !jsonContent.endsWith("}")) {
-                return false;
-            }
-            // Basic check - look for agents array
-            return jsonContent.contains("\"agents\"") && jsonContent.contains("[") && jsonContent.contains("]");
+            System.out.println("SimpleConfLoader: Processing configuration upload");
+            
+            // Use the configuration service to load the configuration
+            ConfigurationResult result = configurationService.loadConfigurationFromMultipart(ri.getContent());
+            
+            // Send success response
+            sendSuccessResponse(toClient, result);
+            
+        } catch (ConfigurationException e) {
+            System.err.println("SimpleConfLoader: Configuration error: " + e.getMessage());
+            sendErrorResponse(toClient, e);
         } catch (Exception e) {
-            return false;
-        }
-    }
-    
-    private String extractJsonFromMultipart(byte[] content) {
-        try {
-            String contentStr = new String(content);
-            System.out.println("SimpleConfLoader: Multipart content length: " + contentStr.length());
-            
-            // Find the file content section
-            String[] lines = contentStr.split("\r\n");
-            boolean inFileSection = false;
-            boolean foundContentStart = false;
-            StringBuilder jsonContent = new StringBuilder();
-            
-            for (String line : lines) {
-                if (line.contains("filename=") && line.contains(".json")) {
-                    inFileSection = true;
-                    System.out.println("SimpleConfLoader: Found JSON file section");
-                    continue;
-                }
-                
-                if (inFileSection && line.trim().isEmpty() && !foundContentStart) {
-                    foundContentStart = true;
-                    continue;
-                }
-                
-                if (inFileSection && foundContentStart) {
-                    if (line.startsWith("--")) {
-                        // End of file content
-                        break;
-                    }
-                    jsonContent.append(line);
-                }
-            }
-            
-            String result = jsonContent.toString().trim();
-            System.out.println("SimpleConfLoader: Extracted JSON: " + result);
-            return result;
-            
-        } catch (Exception e) {
-            System.err.println("SimpleConfLoader: Error extracting JSON from multipart: " + e.getMessage());
-            return null;
-        }
-    }
-    
-    private void createTopicsFromConfig(String jsonContent) {
-        try {
-            System.out.println("SimpleConfLoader: Creating topics from actual configuration");
-            topicManager.clear(); // Clear any existing topics
-            
-            // Parse JSON manually (simple parsing)
-            String[] agents = extractAgents(jsonContent);
-            
-            System.out.println("SimpleConfLoader: Found " + agents.length + " agents in configuration");
-            
-            // Extract all unique topics from the configuration
-            java.util.Set<String> allTopics = new java.util.HashSet<>();
-            java.util.List<AgentInfo> agentInfos = new java.util.ArrayList<>();
-            
-            for (String agent : agents) {
-                String agentClass = extractStringValue(agent, "agentClass");
-                String[] subscriptions = extractArray(agent, "subscriptions");
-                String[] publications = extractArray(agent, "publications");
-                
-                // Store agent info for later creation
-                agentInfos.add(new AgentInfo(agentClass, subscriptions, publications));
-                
-                // Add all subscription topics
-                for (String topic : subscriptions) {
-                    if (!topic.isEmpty()) {
-                        allTopics.add(topic);
-                    }
-                }
-                
-                // Add all publication topics
-                for (String topic : publications) {
-                    if (!topic.isEmpty()) {
-                        allTopics.add(topic);
-                    }
-                }
-            }
-            
-            System.out.println("SimpleConfLoader: Creating " + allTopics.size() + " topics: " + allTopics);
-            
-            // Create all the topics in the TopicManager
-            for (String topicName : allTopics) {
-                if (!topicManager.containsTopic(topicName)) {
-                    topicManager.getTopic(topicName); // This creates the topic
-                    System.out.println("SimpleConfLoader: Created topic: " + topicName);
-                }
-            }
-            
-            System.out.println("SimpleConfLoader: Successfully created all topics from configuration");
-            
-            // Now create and start the agents
-            System.out.println("SimpleConfLoader: Creating and starting agents...");
-            for (AgentInfo agentInfo : agentInfos) {
-                try {
-                    createAgent(agentInfo.agentClass, agentInfo.subscriptions, agentInfo.publications);
-                    System.out.println("SimpleConfLoader: Created agent: " + agentInfo.agentClass);
-                } catch (Exception e) {
-                    System.err.println("SimpleConfLoader: Error creating agent " + agentInfo.agentClass + ": " + e.getMessage());
-                }
-            }
-            
-            System.out.println("SimpleConfLoader: All agents created and started successfully");
-            
-        } catch (Exception e) {
-            System.err.println("SimpleConfLoader: Error creating topics from config: " + e.getMessage());
+            System.err.println("SimpleConfLoader: Unexpected error: " + e.getMessage());
             e.printStackTrace();
+            sendErrorResponse(toClient, new ConfigurationException("Unexpected error: " + e.getMessage(), e));
         }
     }
     
-    // Helper class to store agent information
-    private static class AgentInfo {
-        String agentClass;
-        String[] subscriptions;
-        String[] publications;
-        
-        AgentInfo(String agentClass, String[] subscriptions, String[] publications) {
-            this.agentClass = agentClass;
-            this.subscriptions = subscriptions;
-            this.publications = publications;
-        }
+    /**
+     * @brief Handles GET requests by returning the upload form
+     * @param toClient Output stream to send response
+     * @throws IOException if response writing fails
+     */
+    private void handleUploadForm(OutputStream toClient) throws IOException {
+        String html = createUploadFormHtml();
+        sendHtmlResponse(toClient, html, 200, "OK");
     }
     
-    // Create an agent instance based on class name
-    private void createAgent(String agentClass, String[] subscriptions, String[] publications) throws Exception {
-        switch (agentClass) {
-            case "PlusAgent":
-                configs.PlusAgent plusAgent = new configs.PlusAgent(subscriptions, publications);
-                // Trigger initial processing for PlusAgent if both topics have existing values
-                if (subscriptions.length >= 2) {
-                    boolean hasInitialValues = true;
-                    for (String subTopic : subscriptions) {
-                        if (!topicManager.containsTopic(subTopic)) {
-                            hasInitialValues = false;
-                            break;
-                        }
-                    }
-                    if (hasInitialValues) {
-                        // Send initial values to trigger processing
-                        for (String subTopic : subscriptions) {
-                            graph.Topic topic = topicManager.getTopic(subTopic);
-                            graph.Message lastMsg = topic.getLastMessage();
-                            if (lastMsg != null) {
-                                plusAgent.callback(subTopic, lastMsg);
-                            }
-                        }
-                    }
-                }
-                break;
-            case "IncAgent":
-                configs.IncAgent incAgent = new configs.IncAgent(subscriptions, publications);
-                // Trigger initial processing for IncAgent if the topic has an existing value
-                if (subscriptions.length > 0) {
-                    String subTopic = subscriptions[0];
-                    if (topicManager.containsTopic(subTopic)) {
-                        graph.Topic topic = topicManager.getTopic(subTopic);
-                        graph.Message lastMsg = topic.getLastMessage();
-                        if (lastMsg != null) {
-                            // Process the existing message to initialize the agent
-                            incAgent.callback(subTopic, lastMsg);
-                        }
-                    }
-                }
-                break;
-            case "MulAgent":
-                configs.MulAgent mulAgent = new configs.MulAgent(subscriptions, publications);
-                // Trigger initial processing for MulAgent if both topics have existing values
-                if (subscriptions.length >= 2) {
-                    boolean hasInitialValues = true;
-                    for (String subTopic : subscriptions) {
-                        if (!topicManager.containsTopic(subTopic)) {
-                            hasInitialValues = false;
-                            break;
-                        }
-                    }
-                    if (hasInitialValues) {
-                        // Send initial values to trigger processing
-                        for (String subTopic : subscriptions) {
-                            graph.Topic topic = topicManager.getTopic(subTopic);
-                            graph.Message lastMsg = topic.getLastMessage();
-                            if (lastMsg != null) {
-                                mulAgent.callback(subTopic, lastMsg);
-                            }
-                        }
-                    }
-                }
-                break;
-            case "DivAgent":
-                configs.DivAgent divAgent = new configs.DivAgent(subscriptions, publications);
-                // Trigger initial processing for DivAgent if both topics have existing values
-                if (subscriptions.length >= 2) {
-                    boolean hasInitialValues = true;
-                    for (String subTopic : subscriptions) {
-                        if (!topicManager.containsTopic(subTopic)) {
-                            hasInitialValues = false;
-                            break;
-                        }
-                    }
-                    if (hasInitialValues) {
-                        // Send initial values to trigger processing
-                        for (String subTopic : subscriptions) {
-                            graph.Topic topic = topicManager.getTopic(subTopic);
-                            graph.Message lastMsg = topic.getLastMessage();
-                            if (lastMsg != null) {
-                                divAgent.callback(subTopic, lastMsg);
-                            }
-                        }
-                    }
-                }
-                break;
-            case "SubAgent":
-                configs.SubAgent subAgent = new configs.SubAgent(subscriptions, publications);
-                // Trigger initial processing for SubAgent if both topics have existing values
-                if (subscriptions.length >= 2) {
-                    boolean hasInitialValues = true;
-                    for (String subTopic : subscriptions) {
-                        if (!topicManager.containsTopic(subTopic)) {
-                            hasInitialValues = false;
-                            break;
-                        }
-                    }
-                    if (hasInitialValues) {
-                        // Send initial values to trigger processing
-                        for (String subTopic : subscriptions) {
-                            graph.Topic topic = topicManager.getTopic(subTopic);
-                            graph.Message lastMsg = topic.getLastMessage();
-                            if (lastMsg != null) {
-                                subAgent.callback(subTopic, lastMsg);
-                            }
-                        }
-                    }
-                }
-                break;
-            default:
-                throw new Exception("Unknown agent class: " + agentClass);
-        }
+    /**
+     * @brief Sends a successful configuration loading response
+     * @param toClient Output stream
+     * @param result Configuration loading result
+     * @throws IOException if writing fails
+     */
+    private void sendSuccessResponse(OutputStream toClient, ConfigurationResult result) throws IOException {
+        String html = "<html><body style='background: #1a1a1a; color: #f0f0f0; font-family: Arial; padding: 40px;'>" +
+                "<div style='background: rgba(177,156,217,0.1); padding: 30px; border-radius: 15px; text-align: center;'>" +
+                "<h2 style='color: #87ceeb;'>✅ Configuration Loaded Successfully!</h2>" +
+                "<div style='background: rgba(135,206,235,0.1); padding: 20px; border-radius: 10px; margin: 20px 0;'>" +
+                "<h3 style='color: #c9a96e; margin-top: 0;'>Configuration Details:</h3>" +
+                "<p style='color: #f0f0f0; margin: 5px 0;'><strong>Format:</strong> " + result.getFormat() + "</p>" +
+                "<p style='color: #f0f0f0; margin: 5px 0;'><strong>Agents Created:</strong> " + result.getAgentCount() + "</p>" +
+                "<p style='color: #f0f0f0; margin: 5px 0;'><strong>Topics Created:</strong> " + result.getTopicCount() + "</p>" +
+                "</div>" +
+                "<p style='color: #c9a96e; font-size: 1.1rem;'>Agent network is now active and ready for use.</p>" +
+                "<div style='margin-top: 30px;'>" +
+                "<a href='/' style='color: #87ceeb; text-decoration: none; padding: 12px 25px; background: rgba(135,206,235,0.2); border-radius: 8px; display: inline-block; margin: 5px;'>← Back to Main Page</a>" +
+                "<a href='/app/topics' style='color: #87ceeb; text-decoration: none; padding: 12px 25px; background: rgba(135,206,235,0.2); border-radius: 8px; display: inline-block; margin: 5px;'>View Topics →</a>" +
+                "</div>" +
+                "</div>" +
+                "</body></html>";
+        
+        sendHtmlResponse(toClient, html, 200, "OK");
     }
     
-    // Extract string value from JSON object
-    private String extractStringValue(String jsonObj, String key) {
-        try {
-            String searchKey = "\"" + key + "\"";
-            int keyIndex = jsonObj.indexOf(searchKey);
-            if (keyIndex == -1) return "";
-            
-            int colonIndex = jsonObj.indexOf(":", keyIndex);
-            if (colonIndex == -1) return "";
-            
-            int valueStart = jsonObj.indexOf("\"", colonIndex) + 1;
-            int valueEnd = jsonObj.indexOf("\"", valueStart);
-            
-            if (valueStart == 0 || valueEnd == -1) return "";
-            
-            return jsonObj.substring(valueStart, valueEnd);
-        } catch (Exception e) {
-            return "";
-        }
+    /**
+     * @brief Sends an error response for configuration failures
+     * @param toClient Output stream
+     * @param exception The configuration exception that occurred
+     * @throws IOException if writing fails
+     */
+    private void sendErrorResponse(OutputStream toClient, ConfigurationException exception) throws IOException {
+        String errorHtml = "<html><body style='background: #1a1a1a; color: #f0f0f0; font-family: Arial; padding: 40px;'>" +
+                "<div style='background: rgba(255,107,107,0.1); padding: 30px; border-radius: 15px; border-left: 4px solid #ff6b6b;'>" +
+                "<h2 style='color: #ff6b6b;'>❌ Configuration Error</h2>" +
+                "<div style='background: rgba(0,0,0,0.3); padding: 15px; border-radius: 5px; margin: 15px 0;'>" +
+                "<pre style='color: #f0f0f0; font-family: monospace; margin: 0; white-space: pre-wrap;'>" +
+                escapeHtml(exception.getMessage()) + "</pre>" +
+                "</div>" +
+                "<div style='margin-top: 20px;'>" +
+                "<a href='/app/conf-loader' style='color: #87ceeb; text-decoration: none; padding: 12px 25px; background: rgba(135,206,235,0.2); border-radius: 8px; display: inline-block; margin: 5px;'>← Try Again</a>" +
+                "<a href='/' style='color: #87ceeb; text-decoration: none; padding: 12px 25px; background: rgba(135,206,235,0.2); border-radius: 8px; display: inline-block; margin: 5px;'>Back to Main Page</a>" +
+                "</div>" +
+                "</div>" +
+                "</body></html>";
+        
+        sendHtmlResponse(toClient, errorHtml, 500, "Internal Server Error");
     }
     
-    private String[] extractAgents(String jsonContent) {
-        java.util.List<String> agents = new java.util.ArrayList<>();
-        
-        // Find the agents array
-        int agentsStart = jsonContent.indexOf("\"agents\"");
-        if (agentsStart == -1) {
-            return new String[0];
-        }
-        
-        int arrayStart = jsonContent.indexOf("[", agentsStart);
-        if (arrayStart == -1) {
-            return new String[0];
-        }
-        
-        int level = 0;
-        int objStart = -1;
-        
-        for (int i = arrayStart; i < jsonContent.length(); i++) {
-            char c = jsonContent.charAt(i);
-            
-            if (c == '{') {
-                if (level == 0) {
-                    objStart = i;
-                }
-                level++;
-            } else if (c == '}') {
-                level--;
-                if (level == 0 && objStart != -1) {
-                    agents.add(jsonContent.substring(objStart, i + 1));
-                }
-            } else if (c == ']' && level == 0) {
-                break;
-            }
-        }
-        
-        return agents.toArray(new String[0]);
+    /**
+     * @brief Creates the HTML for the configuration upload form
+     * @return HTML string for the upload form
+     */
+    private String createUploadFormHtml() {
+        return "<html><head><title>Upload Configuration</title></head>" +
+                "<body style='font-family: Arial; background: #2d2d2d; color: #f0f0f0; padding: 40px;'>" +
+                "<div style='max-width: 600px; margin: 0 auto; background: rgba(177,156,217,0.1); padding: 30px; border-radius: 15px;'>" +
+                "<h2 style='color: #b19cd9; text-align: center; margin-top: 0;'>Configuration Upload</h2>" +
+                "<p style='color: #c9a96e; text-align: center; margin-bottom: 30px;'>Upload JSON or CONF format configuration files</p>" +
+                "<form method='post' enctype='multipart/form-data' style='text-align: center;'>" +
+                "<div style='margin: 30px 0;'>" +
+                "<input type='file' name='configFile' accept='.json,.conf' " +
+                "style='padding: 15px; background: rgba(255,255,255,0.1); border: 2px solid #b19cd9; border-radius: 10px; color: #f0f0f0; font-size: 1rem; width: 100%; max-width: 400px;'><br><br>" +
+                "<input type='submit' value='Upload Configuration' " +
+                "style='background: linear-gradient(45deg, #b19cd9, #c9a96e); color: white; border: none; padding: 15px 40px; border-radius: 25px; font-size: 1.1rem; cursor: pointer; transition: all 0.3s ease;' " +
+                "onmouseover='this.style.transform=\"scale(1.05)\"' onmouseout='this.style.transform=\"scale(1)\"'>" +
+                "</div>" +
+                "</form>" +
+                "<div style='text-align: center; margin-top: 30px;'>" +
+                "<a href='/' style='color: #87ceeb; text-decoration: none; padding: 12px 25px; background: rgba(135,206,235,0.2); border-radius: 8px; display: inline-block;'>← Back to Main Page</a>" +
+                "</div>" +
+                "<div style='margin-top: 30px; padding: 20px; background: rgba(135,206,235,0.1); border-radius: 10px;'>" +
+                "<h3 style='color: #87ceeb; margin-top: 0;'>Supported Formats:</h3>" +
+                "<ul style='color: #f0f0f0; text-align: left;'>" +
+                "<li><strong>JSON:</strong> {\"agents\": [{\"type\": \"PlusAgent\", \"subscriptions\": [\"X\", \"Y\"], \"publications\": [\"Sum\"]}]}</li>" +
+                "<li><strong>CONF:</strong> Line-based format with agent class, subscriptions, and publications on separate lines</li>" +
+                "</ul>" +
+                "</div>" +
+                "</div>" +
+                "</body></html>";
     }
     
-    private String[] extractArray(String json, String key) {
-        java.util.List<String> values = new java.util.ArrayList<>();
-        String searchKey = "\"" + key + "\"";
-        int start = json.indexOf(searchKey);
-        if (start == -1) return new String[0];
-        
-        start = json.indexOf("[", start);
-        if (start == -1) return new String[0];
-        
-        boolean inString = false;
-        StringBuilder current = new StringBuilder();
-        
-        for (int i = start + 1; i < json.length(); i++) {
-            char c = json.charAt(i);
-            
-            if (c == '"' && (i == 0 || json.charAt(i - 1) != '\\')) {
-                if (inString) {
-                    values.add(current.toString());
-                    current = new StringBuilder();
-                    inString = false;
-                } else {
-                    inString = true;
-                }
-            } else if (inString) {
-                current.append(c);
-            } else if (c == ']') {
-                break;
-            }
-        }
-        
-        return values.toArray(new String[0]);
+    /**
+     * @brief Sends an HTML response
+     * @param toClient Output stream
+     * @param html HTML content
+     * @param statusCode HTTP status code
+     * @param statusText HTTP status text
+     * @throws IOException if writing fails
+     */
+    private void sendHtmlResponse(OutputStream toClient, String html, int statusCode, String statusText) throws IOException {
+        byte[] response = ("HTTP/1.1 " + statusCode + " " + statusText + "\r\n" +
+                "Content-Type: text/html; charset=utf-8\r\n" +
+                "Content-Length: " + html.getBytes("UTF-8").length + "\r\n" +
+                "\r\n" + html).getBytes("UTF-8");
+        toClient.write(response);
+    }
+    
+    /**
+     * @brief Escapes HTML special characters
+     * @param text Text to escape
+     * @return Escaped text
+     */
+    private String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;")
+                  .replace("<", "&lt;")
+                  .replace(">", "&gt;")
+                  .replace("\"", "&quot;")
+                  .replace("'", "&#39;");
     }
 }

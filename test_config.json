@@ -1,0 +1,16 @@
+{
+  "agents": [
+    {
+      "name": "PlusAgent1",
+      "type": "configs.PlusAgent", 
+      "subscriptions": ["X", "Y"],
+      "publications": ["Sum"]
+    },
+    {
+      "name": "IncAgent1",
+      "type": "configs.IncAgent",
+      "subscriptions": ["Sum"],
+      "publications": ["Result"]
+    }
+  ]
+}
