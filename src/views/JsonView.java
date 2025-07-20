@@ -26,6 +26,10 @@ public class JsonView implements View {
         output.flush();
     }
     
+    /**
+     * @brief Returns the content type for JSON responses
+     * @return String containing "application/json; charset=UTF-8"
+     */
     @Override
     public String getContentType() {
         return "application/json; charset=UTF-8";

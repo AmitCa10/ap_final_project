@@ -25,6 +25,10 @@ public class TopicView implements View {
         output.flush();
     }
     
+    /**
+     * @brief Returns the content type for HTML responses
+     * @return String containing "text/html; charset=UTF-8"
+     */
     @Override
     public String getContentType() {
         return "text/html; charset=UTF-8";

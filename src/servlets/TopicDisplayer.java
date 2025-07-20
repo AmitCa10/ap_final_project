@@ -17,8 +17,37 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @file TopicDisplayer.java
+ * @brief Servlet for displaying and managing topics in the Agent Graph Manager
+ * @author Advanced Programming Course
+ * @date 2025
+ * @version 1.0
+ * 
+ * This servlet handles both GET and POST requests related to topics:
+ * - GET requests return an HTML table showing all current topics and their messages
+ * - POST requests allow publishing new messages to specific topics
+ * 
+ * The servlet uses the MVC pattern with View classes to generate HTML responses.
+ */
 public class TopicDisplayer implements Servlet {
 
+    /**
+     * @brief Handles HTTP requests for topic display and message publishing
+     * @param ri The RequestInfo containing parsed HTTP request details
+     * @param toClient The OutputStream to write the HTTP response to
+     * @throws IOException if there's an error writing to the output stream
+     * 
+     * @details For POST requests, this method:
+     * - Parses form data to extract topic name and message text
+     * - Publishes the message to the specified topic
+     * - Returns the current state of all topics
+     * 
+     * For GET requests, this method:
+     * - Retrieves all current topics from the TopicManager
+     * - Uses TopicView to format the topics as HTML table rows
+     * - Sends proper HTTP headers and response body
+     */
     @Override
     public void handle(RequestInfo ri, OutputStream toClient) throws IOException {
         try {

@@ -3,22 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          // Listen for messages from iframes
-        window.addEventListener('message', function(event) {
-            if (event.origin !== window.location.origin) return;
-            
-            console.log('Main: Received message:', event.data);
-            const { type, data } = event.data;
-            
-            switch (type) {
-                case 'configUploaded':
-                    console.log('Main: Configuration uploaded, refreshing monitor...');
-                    // Broadcast to all other frames
-                    broadcastToFrames('configUpdated', data, 'uploadFrame');
-                    // Immediately refresh the monitor frame
-                    sendToFrame('monitorFrame', 'refreshTopics', {});
-                    showNotification('Configuration uploaded successfully!', 'success');
-                    break; Graph Manager</title>
+    <title>Agent Graph Manager</title>
     <style>
         * {
             margin: 0;
@@ -161,10 +146,12 @@
         window.addEventListener('message', function(event) {
             if (event.origin !== window.location.origin) return;
             
+            console.log('Main: Received message:', event.data);
             const { type, data } = event.data;
             
             switch (type) {
                 case 'configUploaded':
+                    console.log('Main: Configuration uploaded, refreshing monitor...');
                     // Broadcast to all other frames
                     broadcastToFrames('configUpdated', data, 'uploadFrame');
                     // Immediately refresh the monitor frame

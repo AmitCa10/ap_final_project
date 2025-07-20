@@ -8,8 +8,24 @@ import graph.TopicManagerSingleton.TopicManager;
 import java.io.IOException;
 import java.io.OutputStream;
 
+/**
+ * @file SimpleConfLoader.java
+ * @brief Servlet for handling configuration file uploads and agent network setup
+ * @author Advanced Programming Course
+ * @date 2025
+ * @version 1.0
+ * 
+ * This servlet handles both GET and POST requests for configuration management:
+ * - GET requests return an HTML form for uploading configuration files
+ * - POST requests process uploaded JSON configuration files, create topics,
+ *   instantiate agents, and set up the agent network according to the configuration.
+ * 
+ * The servlet supports multipart form data uploads and provides comprehensive
+ * error handling with user-friendly error messages.
+ */
 public class SimpleConfLoader implements Servlet {
     
+    /** @brief Reference to the TopicManager for creating and managing topics */
     private final TopicManager topicManager;
     
     public SimpleConfLoader() {

@@ -9,8 +9,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/**
+ * @file HtmlLoader.java
+ * @brief Servlet for serving static HTML files and web assets
+ * @author Advanced Programming Course
+ * @date 2025
+ * @version 1.0
+ * 
+ * This servlet handles serving static files (HTML, CSS, JavaScript, images) from
+ * a specified directory. It maps URL paths to file system paths and serves the
+ * appropriate content with correct MIME types. Used to serve the web interface
+ * files for the Agent Graph Manager application.
+ */
 public class HtmlLoader implements Servlet {
     
+    /** @brief Directory path where HTML files are stored */
     private final String htmlDir;
     
     public HtmlLoader(String htmlDirectory) {

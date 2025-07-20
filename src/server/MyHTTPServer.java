@@ -11,16 +11,49 @@ import java.util.Arrays;
 import java.util.concurrent.*;
 import servlet.Servlet;
 
+/**
+ * @file MyHTTPServer.java
+ * @brief Multi-threaded HTTP server implementation for the Agent Graph Manager
+ * @author Advanced Programming Course
+ * @date 2025
+ * @version 1.0
+ * 
+ * This class implements a multi-threaded HTTP server that can handle concurrent
+ * requests using a thread pool. It supports servlet-based request routing for
+ * GET, POST, and DELETE methods. The server provides the infrastructure for
+ * the Agent Graph Manager web application.
+ */
 public class MyHTTPServer extends Thread implements HTTPServer {
 
+    /** @brief Port number the server listens on */
     private final int port;
+    
+    /** @brief Map of GET request servlets indexed by URI path */
     private final ConcurrentMap<String, Servlet> servletsGet    = new ConcurrentHashMap<>();
+    
+    /** @brief Map of POST request servlets indexed by URI path */
     private final ConcurrentMap<String, Servlet> servletsPost   = new ConcurrentHashMap<>();
+    
+    /** @brief Map of DELETE request servlets indexed by URI path */
     private final ConcurrentMap<String, Servlet> servletsDelete = new ConcurrentHashMap<>();
+    
+    /** @brief Thread pool for handling concurrent requests */
     private final ExecutorService threadPool;
+    
+    /** @brief Flag indicating if the server is running */
     private volatile boolean running;
+    
+    /** @brief The server socket for accepting connections */
     private ServerSocket serverSocket;
 
+    /**
+     * @brief Constructor for MyHTTPServer
+     * @param port The port number to listen on
+     * @param nThreads The number of threads in the thread pool for handling requests
+     * 
+     * Creates a new HTTP server that will listen on the specified port and use
+     * a thread pool of the specified size to handle concurrent requests.
+     */
     public MyHTTPServer(int port, int nThreads) {
         this.port = port;
         this.threadPool = Executors.newFixedThreadPool(nThreads);
@@ -28,12 +61,35 @@ public class MyHTTPServer extends Thread implements HTTPServer {
 
     /* ---------------- registry ---------------- */
 
+    /**
+     * @brief Registers a servlet for a specific HTTP method and URI
+     * @param httpCommand The HTTP method (GET, POST, DELETE)
+     * @param uri The URI path to map the servlet to
+     * @param s The servlet instance to handle requests to this URI
+     * 
+     * Maps a servlet to handle requests for a specific HTTP method and URI.
+     * The servlet will be invoked when requests matching both the method
+     * and URI are received.
+     */
     public void addServlet(String httpCommand, String uri, Servlet s) {
         getRequestMap(httpCommand).put(uri, s);
     }
+    
+    /**
+     * @brief Removes a servlet mapping for a specific HTTP method and URI
+     * @param httpCommand The HTTP method (GET, POST, DELETE)
+     * @param uri The URI path to remove the servlet mapping from
+     */
     public void removeServlet(String httpCommand, String uri) {
         getRequestMap(httpCommand).remove(uri);
     }
+    
+    /**
+     * @brief Gets the appropriate servlet map for the given HTTP command
+     * @param cmd The HTTP command (GET, POST, DELETE)
+     * @return The ConcurrentMap containing servlets for this HTTP method
+     * @throws IllegalArgumentException if the HTTP command is not supported
+     */
     private ConcurrentMap<String, Servlet> getRequestMap(String cmd) {
         switch (cmd.toUpperCase()) {
             case "GET":    return servletsGet;
@@ -44,6 +100,14 @@ public class MyHTTPServer extends Thread implements HTTPServer {
     }
 
     /* ---------------- longest‑prefix matcher (restored) ---------------- */
+    /**
+     * @brief Finds the appropriate servlet for the given request using longest-prefix matching
+     * @param ri The RequestInfo containing the parsed HTTP request details
+     * @return The servlet that should handle this request, or null if none found
+     * 
+     * Uses longest-prefix matching to find the most specific servlet mapping
+     * for the request URI. This allows for hierarchical URL structures.
+     */
     private Servlet getServlet(RequestParser.RequestInfo ri) {
         String[] segs = ri.getUriSegments();
         ConcurrentMap<String, Servlet> map = getRequestMap(ri.getHttpCommand());

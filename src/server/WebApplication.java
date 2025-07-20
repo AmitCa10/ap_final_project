@@ -4,8 +4,38 @@ import servlets.SimpleConfLoader;
 import servlets.TopicDisplayer;
 import servlets.HtmlLoader;
 
+/**
+ * @file WebApplication.java
+ * @brief Main entry point for the Agent Graph Manager web application
+ * @author Advanced Programming Course
+ * @date 2025
+ * @version 1.0
+ * 
+ * This class serves as the main entry point for the Agent Graph Manager application.
+ * It sets up the HTTP server with all necessary servlets and provides a web-based
+ * interface for managing and monitoring agent networks.
+ */
 public class WebApplication {
     
+    /**
+     * @brief Main method that starts the Agent Graph Manager web application
+     * @details This method initializes the HTTP server, configures all servlets,
+     * and starts listening on port 8080. The application provides:
+     * - Static file serving for the web interface
+     * - Configuration upload and processing
+     * - Real-time topic monitoring
+     * - Message publishing capabilities
+     * 
+     * @param args Command line arguments (currently unused)
+     * 
+     * The server runs with the following endpoints:
+     * - GET  / - Main application page
+     * - GET  /index.html - Main application page  
+     * - GET  /app/conf-loader - Configuration upload form
+     * - POST /app/conf-loader - Configuration processing
+     * - GET  /app/topics - Topic monitoring (returns HTML table)
+     * - POST /app/topics - Message publishing
+     */
     public static void main(String[] args) {
         System.out.println("Starting Web Application for Agent Graph Manager...");
         

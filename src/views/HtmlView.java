@@ -14,6 +14,12 @@ public class HtmlView implements View {
         this.template = template;
     }
     
+    /**
+     * @brief Renders data as HTML with complete HTTP response headers
+     * @param data The data to render as HTML content
+     * @param output Stream to write the rendered HTML response
+     * @throws IOException if writing to output stream fails
+     */
     @Override
     public void render(Object data, OutputStream output) throws IOException {
         String htmlContent = generateHtmlContent(data);
@@ -29,6 +35,10 @@ public class HtmlView implements View {
         output.flush();
     }
     
+    /**
+     * @brief Returns the content type for HTML responses
+     * @return String containing "text/html; charset=UTF-8"
+     */
     @Override
     public String getContentType() {
         return "text/html; charset=UTF-8";
