@@ -94,12 +94,21 @@ public class MulAgent implements Agent {
         double v = msg.asDouble;
         if (Double.isNaN(v)) return;
 
-        if (topic.equals(subs[0])) { x = v; hasX = true; }
-        else if (topic.equals(subs[1])) { y = v; hasY = true; }
+        // Update the corresponding operand
+        if (topic.equals(subs[0])) { 
+            x = v; 
+            hasX = true; 
+        }
+        else if (topic.equals(subs[1])) { 
+            y = v; 
+            hasY = true; 
+        }
 
+        // REACTIVE: Calculate whenever we have both values
         if (hasX && hasY) {
-            out.publish(new Message(x * y));
-            reset();
+            double result = x * y;
+            out.publish(new Message(result));
+            // NO RESET - maintain state for continuous updates
         }
     }
 

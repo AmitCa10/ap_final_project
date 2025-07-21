@@ -83,26 +83,36 @@ public class DivAgent implements Agent {
      * @param topic The name of the topic that received the message
      * @param msg The message containing the numeric value
      * 
-     * This method processes incoming messages by storing the numeric value
-     * and checking if both inputs are now available. If both inputs have
-     * been received, it computes their quotient with division-by-zero protection
-     * and publishes the result. The agent then resets itself for the next cycle.
+     * This method processes incoming messages using a REACTIVE approach - it updates
+     * the corresponding operand and immediately recalculates if both operands are
+     * available, without requiring both to be "fresh". This enables real-time
+     * updates when any operand changes.
      */
     @Override
     public void callback(String topic, Message msg) {
         double v = msg.asDouble;
         if (Double.isNaN(v)) return;
 
-        if (topic.equals(subs[0])) { x = v; hasX = true; }
-        else if (topic.equals(subs[1])) { y = v; hasY = true; }
+        // Update the corresponding operand
+        if (topic.equals(subs[0])) { 
+            x = v; 
+            hasX = true; 
+        }
+        else if (topic.equals(subs[1])) { 
+            y = v; 
+            hasY = true; 
+        }
 
+        // REACTIVE: Calculate whenever we have both values (no reset needed)
         if (hasX && hasY) {
+            double result;
             if (y != 0) {
-                out.publish(new Message(x / y));
+                result = x / y;
             } else {
-                out.publish(new Message(Double.NaN));
+                result = Double.NaN;
             }
-            reset();
+            out.publish(new Message(result));
+            // NO RESET - maintain state for continuous updates
         }
     }
 
